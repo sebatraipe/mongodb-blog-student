@@ -1,254 +1,170 @@
 package ar.unrn.api;
 
+import static com.mongodb.client.model.Accumulators.addToSet;
+import static com.mongodb.client.model.Accumulators.sum;
+import static com.mongodb.client.model.Aggregates.*;
+import static com.mongodb.client.model.Filters.eq;
+import static com.mongodb.client.model.Projections.*;
 import static spark.Spark.get;
 
+import static com.mongodb.client.model.Aggregates.*;
+import static com.mongodb.client.model.Projections.*;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonArrayFormatVisitor;
+import com.mongodb.client.*;
+import com.mongodb.client.model.*;
+import org.bson.Document;
+import org.bson.conversions.Bson;
+import org.bson.json.JsonObject;
+import org.bson.json.JsonWriterSettings;
+import org.bson.types.ObjectId;
+import com.mongodb.client.AggregateIterable;
 import spark.Spark;
+import org.bson.conversions.Bson;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 public class BlogAPI {
-	
-	public static void main(String[] args) {
 
-		/**
-		 * Recupera una página por su id.
-		 * Debe retornar un json con la siguiente estructura:
-		 * 
-		 * [
-			   {
-			      "_id":{
-			         "$oid":"59ea5578fad4770f3bb0df1c"
-			      },
-			      "titulo":"Sobre las Infusiones, legales... ;)",
-			      "texto":"Una infusión es una bebida...",
-			      "autor":"Yo Mismo",
-			      "fecha":{
-			         "$date":"2017-10-20T19:58:48.408Z"
-			      }
-			   }
-			]
-		 * */
-		get("/pagina-id/:id", (req, res) ->
-			{
-				res.header("Access-Control-Allow-Origin", "*");
-				//Recupero el id que viene por parámetro
-				String paginaId = req.params("id");
+    public static void main(String[] args) {
 
-				//implementar aca ...
-				return null;
-			});
+        Spark.init();
 
-		/**
-		 * Devuelve un array de objetos id,count. Donde id es el nombre del autor y count la cantidad de post
-		 * que realizó.
-		 *  
-		 * Debe retornar un json con la siguiente estructura:
-		 *  
-		 * [
-			   {
-			      "_id":"Jorge Boles",
-			      "count":2
-			   }
-			   ...	
-			]
-		 * */
-		get("/byautor", (req, res) ->
-			{
-				res.header("Access-Control-Allow-Origin", "*");
+        //localhost:4567/
 
-    //implementar aca ...
-    return null;
-			});
+        MongoClient mongoClient = MongoClients.create("mongodb://localhost:27017");
+        MongoDatabase database = mongoClient.getDatabase("Blog");
 
-		/**
-		 * Retorna los ultimos 4 post ordenados por fecha.
-		 * 
-		 * Debe retornar un json con la siguiente estructura:
-		 * 4 documentos/post y solo 4 debe retornar.
-		 * 
-		 * [
-			   {
-			      "_id":{
-			         "$oid":"59e7e0b7fad4775bfde9623e"
-			      },
-			      "titulo":"Café",
-			      "resumen":"Sobre el Café solo..."
-			   },
-			   {
-			      "_id":{
-			         "$oid":"59e7df6efad4775bb2e9093c"
-			      },
-			      "titulo":"Té",
-			      "resumen":"Sobre el Té solo..."
-			   },
-			   {
-			      "_id":{
-			         "$oid":"59e7df6cfaw4775bb2e9093c"
-			      },
-			      "titulo":"Mate",
-			      "resumen":"Sobre el Mate..."
-			   },
-			   {
-			      "_id":{
-			         "$oid":"59e7df6cfad4175bb2e9093c"
-			      },
-			      "titulo":"Mate Cocido",
-			      "resumen":"Sobre el Mate Cocido..."
-			   }
-			]
-		 * 
-		 * */
-		get("/ultimos4posts", (req, res) ->
-			{
-				res.header("Access-Control-Allow-Origin", "*");
+        get("/pages/:id", (req, res) -> {
+            res.header("Access-Control-Allow-Origin", "*");
+            //Recupero el id que viene por parámetro
+            MongoCollection<Document> paginasCollection = database.getCollection("paginas");
 
-    //implementar aca ...
-    return null;
-			});
+            String paginaId = req.params("id");
 
-		/**
-		 * Retorna todos los Post para un autor, dado su nombre
-		 * Debe retornar un json con la siguiente estructura:
-		 * 
-		 * [
-			   {
-			      "_id":{
-			         "$oid":"59e7df6cfad4775bb2e9093c"
-			      },
-			      "titulo":"Café",
-			      "resumen":"Sobre el Café solo...",
-			      "texto":"El texto completo del post...",
-			      "tags":[
-			         "café",
-			         "infusión"
-			      ],
-			      "links-relacionados":[
-			         "http://cafenegro.com",
-			         "http://cafecito.com"
-			      ],
-			      "autor":"Jorge Boles",
-			      "fecha":{
-			         "$date":"2017-10-18T23:10:36.305Z"
-			      }
-			   },
-			   {
-			      "_id":{
-			         "$oid":"52r7e0b7fad4775bfde9625e"
-			      },
-			      "titulo":"Té",
-			      "resumen":"Sobre el Té solo...",
-			      "texto":"El texto completo del posts...",
-			      "tags":[
-			         "té",
-			         "infusión"
-			      ],
-			      "links-relacionados":[
-			         "http://te.com",
-			         "http://teconleche.com"
-			      ],
-			      "autor":"Julio Mark",
-			      "fecha":{
-			         "$date":"2017-03-10T12:16:05.755Z"
-			      }
-			   },
-			   ...
-			]
-		 * */
-		get("/posts-autor/:nombreautor", (req, res) ->
-			{
-				res.header("Access-Control-Allow-Origin", "*");
-				
-				//Recupero el nombre del autor que viene como parámetro
-				String nombreAutor = req.params("nombreautor");
+            ObjectId objectId = new ObjectId(paginaId);
 
-    //implementar aca ...
-    return null;
-			});
+            Document pagina = paginasCollection.find(eq("_id", objectId)).first();
 
-		/**
-		 * Retorna un post dado un id.
-		 * 
-		 * Debe retornar un json con la siguiente estructura:
-		 * 
-		 * [
-			   {
-			      "_id":{
-			         "$oid":"59e7e0b7fad4775bfde9625e"
-			      },
-			      "titulo":"Café",
-			      "resumen":"Sobre el Café solo...",
-			      "texto":"El texto completo del posts...",
-			      "tags":[
-			         "té",
-			         "infusión"
-			      ],
-			      "links-relacionados":[
-			         "http://cafenegro.com",
-			         "http://cafecito.com"
-			      ],
-			      "autor":"Jorge Boles",
-			      "fecha":{
-			         "$date":"2017-10-18T23:16:05.755Z"
-			      }
-			   }
-			]
-		 * */
-		get("/post-id/:id", (req, res) ->
-			{
-				res.header("Access-Control-Allow-Origin", "*");
-				
-				//Recupero el id del post que viene por parámetro
-				String postId = req.params("id");
+            if (pagina != null) {
+                List<String> pages = new ArrayList<>();
+                pages.add(pagina.toJson());
+                return pages;
+            } else {
+                return "{ \"message\": \"Página con ID " + paginaId + " no encontrada\" }";
+            }
+        });
 
-    //implementar aca ...
-    return null;
-			});
+        get("/byautor", (req, res) -> {
+            res.header("Access-Control-Allow-Origin", "*");
 
-		/**
-		 * Búsqueda libre dentro del texto del documento.
-		 * Debe retornar un json con la siguiente estructura:
-		 * 
-		 * [
-			   //cada objeto json dentro del array es un resultado de la busqueda	
-			   {
-			      "_id":{
-			         "$oid":"59e7df6cfad4775bb2e9093c"
-			      },
-			      "titulo":"Café",
-			      "resumen":"Sobre el Café solo...",
-			      "autor":"Jorge Boles",
-			      "fecha":{
-			         "$date":"2017-10-18T23:10:36.305Z"
-			      }
-			   },
-			   {
-			      "_id":{
-			         "$oid":"59e7e0b7fad4775bfde9625e"
-			      },
-			      "titulo":"Te con Leche",
-			      "resumen":"Sobre el Te con Leche...",
-			      "autor":"Javier Garcia",
-			      "fecha":{
-			         "$date":"2017-10-18T23:16:05.755Z"
-			      }
-			   }
-			   ...
-			]
-		 * 
-		 * */
-		get("/search/:text", (req, res) ->
-			{
-				res.header("Access-Control-Allow-Origin", "*");
-				
-				//Recupero la palabra/frase ingresada por el usuario
-				String text = req.params("text");
-				
-    //implementar aca ...
-    return null;
-			});
-		
-		Spark.exception(Exception.class, (exception, request, response) ->
-		{
-				exception.printStackTrace();
-		});
+            MongoCollection<Document> collection = database.getCollection("posts");
 
-	}
+            AggregateIterable<Document> result = collection.aggregate(
+                    Arrays.asList(
+                            Aggregates.group("$author", Accumulators.sum("count", 1))
+                    )
+            );
+
+            List<String> resultList = new ArrayList<>();
+            for (Document doc : result) {
+                Document authorCount = new Document();
+                authorCount.put("_id", doc.get("_id"));
+                authorCount.put("count", doc.get("count"));
+                resultList.add(authorCount.toJson());
+            }
+
+            return resultList;
+
+        });
+
+        get("/ultimos4posts", (req, res) -> {
+            res.header("Access-Control-Allow-Origin", "*");
+
+            MongoCollection<Document> collection = database.getCollection("posts");
+
+            Bson sort = Sorts.descending("date");
+
+            FindIterable<Document> result = collection.find().sort(sort).limit(4);
+
+            List<String> posts = new ArrayList<>();
+
+            for (Document doc : result) {
+                posts.add(doc.toJson());
+            }
+
+            return posts;
+        });
+
+        get("/post/autor/:nombreautor", (req, res) -> {
+            res.header("Access-Control-Allow-Origin", "*");
+
+            //Recupero el nombre del autor que viene como parámetro
+            String nombreAutor = req.params("nombreautor");
+
+            MongoCollection<Document> postCollection = database.getCollection("posts");
+
+            Document post = postCollection.find(eq("author", nombreAutor)).first();
+
+            if (post != null) {
+                List<String> postList = new ArrayList<>();
+                postList.add(post.toJson());
+                return postList;
+            } else {
+                return "{ \"message\": \"Post con ID " + nombreAutor + " no encontrado\" }";
+            }
+        });
+
+        get("/post/:id", (req, res) -> {
+            res.header("Access-Control-Allow-Origin", "*");
+
+
+            MongoCollection<Document> postCollection = database.getCollection("posts");
+
+            //Recupero el id del post que viene por parámetro
+            String postId = req.params("id");
+
+            ObjectId objectId = new ObjectId(postId);
+
+            Document post = postCollection.find(eq("_id", objectId)).first();
+
+            if (post != null) {
+                List<String> posts = new ArrayList<>();
+                posts.add(post.toJson());
+                return posts;
+            } else {
+                return "{ \"message\": \"Post con ID " + postId + " no encontrado\" }";
+            }
+        });
+
+        get("/search/:text", (req, res) -> {
+            res.header("Access-Control-Allow-Origin", "*");
+
+            MongoCollection<Document> collection = database.getCollection("posts");
+
+            collection.createIndex(Indexes.text("text"));
+
+            //Recupero la palabra/frase ingresada por el usuario
+            String text = req.params("text");
+
+            FindIterable<Document> result = collection.find(Filters.text(text));
+
+            List<String> resultList = new ArrayList<>();
+
+            for (Document document : result) {
+                resultList.add(document.toJson());
+            }
+
+            return resultList;
+        });
+
+        Spark.exception(Exception.class, (exception, request, response) ->
+        {
+            exception.printStackTrace();
+        });
+    }
 }
